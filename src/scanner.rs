@@ -52,18 +52,58 @@ impl Scanner {
             '+' => self.add_token(TokenKind::Plus, None),
             ';' => self.add_token(TokenKind::Semicolon, None),
             '*' => self.add_token(TokenKind::Star, None),
-            _ => lox.error(self.line, String::from("Unexpected character")),
+            '!' => {
+                let kind = match self.advance_if_next('=') {
+                    true => TokenKind::BangEqual,
+                    false => TokenKind::Bang,
+                };
+                self.add_token(kind, None)
+            },
+            '=' => {
+                let kind = match self.advance_if_next('=') {
+                    true => TokenKind::EqualEqual,
+                    false => TokenKind::Equal,
+                };
+                self.add_token(kind, None)
+            },
+            '<' => {
+                let kind = match self.advance_if_next('=') {
+                    true => TokenKind::LessEqual,
+                    false => TokenKind::Less,
+                };
+                self.add_token(kind, None)
+            },
+            '>' => {
+                let kind = match self.advance_if_next('=') {
+                    true => TokenKind::GreaterEqual,
+                    false => TokenKind::Greater,
+                };
+                self.add_token(kind, None)
+            },
+            _ => lox.error(self.line, format!("Unexpected character")),
         }
     }
 
-    fn advance(&mut self) -> char {
-        let c = self
-            .source
+    fn current_char(&self) -> char {
+        self.source
             .chars()
             .nth(self.current)
-            .expect(format!("source out of bounds at {}", self.current).as_str());
+            .expect(format!("source out of bounds at {}", self.current).as_str())
+    }
+
+    fn advance(&mut self) -> char {
+        let c = self.current_char();
         self.current += 1;
         c
+    }
+
+    fn advance_if_next(&mut self, conditional: char) -> bool {
+        return if !self.is_at_end() && self.current_char() != conditional {
+            false
+        } else {
+            self.current += 1;
+            true
+        };
     }
 
     fn add_token(&mut self, kind: TokenKind, literal: Option<String>) {

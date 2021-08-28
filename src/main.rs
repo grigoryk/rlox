@@ -3,9 +3,7 @@ mod scanner;
 mod types;
 
 use lox::Lox;
-use std::fmt;
 use structopt::StructOpt;
-use types::Token;
 
 #[derive(StructOpt)]
 struct Cli {
