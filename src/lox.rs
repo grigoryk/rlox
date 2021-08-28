@@ -33,16 +33,15 @@ impl Lox {
     pub fn run_file(&mut self, path: std::path::PathBuf) {
         println!("Running {:?}", path);
         let content = std::fs::read_to_string(&path).expect("could not read file");
-        for line in content.lines() {
-            self.run(line.to_string());
-            if self.had_error {
-                std::process::exit(1);
-            }
+        self.run(content);
+        if self.had_error {
+            println!("Error during scanning, exit...");
+            std::process::exit(1);
         }
     }
 
     pub fn repl(&mut self) {
-        println!("Welcome to Lox");
+        println!("Welcome to Lox!");
         println!("--------------");
         loop {
             let line: String = read!("{}\n");

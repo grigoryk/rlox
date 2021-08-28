@@ -42,6 +42,14 @@ impl Scanner {
 
     fn scan_token(&mut self, lox: &mut Lox) {
         match self.advance() {
+            // whitespace
+            ' ' | '\r' | '\t' => {},
+            // newline
+            '\n' => {
+                println!("newline!");
+                self.line += 1
+            },
+            // single-character lexemes
             '(' => self.add_token(TokenKind::LeftParen, None),
             ')' => self.add_token(TokenKind::RightParen, None),
             '{' => self.add_token(TokenKind::LeftBrace, None),
@@ -52,6 +60,17 @@ impl Scanner {
             '+' => self.add_token(TokenKind::Plus, None),
             ';' => self.add_token(TokenKind::Semicolon, None),
             '*' => self.add_token(TokenKind::Star, None),
+            '/' => {
+                // if this is a comment, denoted by //, skip until end of the line
+                if self.advance_if_next('/') {
+                    while self.peek() != '\n' && !self.is_at_end() {
+                        self.advance();
+                    }
+                } else {
+                    self.add_token(TokenKind::Slash, None)
+                }
+            },
+            // single or two character lexemes
             '!' => {
                 let kind = match self.advance_if_next('=') {
                     true => TokenKind::BangEqual,
@@ -80,6 +99,7 @@ impl Scanner {
                 };
                 self.add_token(kind, None)
             },
+
             _ => lox.error(self.line, format!("Unexpected character")),
         }
     }
@@ -98,12 +118,22 @@ impl Scanner {
     }
 
     fn advance_if_next(&mut self, conditional: char) -> bool {
-        return if !self.is_at_end() && self.current_char() != conditional {
+        return if self.is_at_end() {
+            false
+        } else if self.current_char() != conditional {
             false
         } else {
             self.current += 1;
             true
         };
+    }
+
+    fn peek(&self) -> char {
+        return if self.is_at_end() {
+            '\0'
+        } else {
+            self.current_char()
+        }
     }
 
     fn add_token(&mut self, kind: TokenKind, literal: Option<String>) {
