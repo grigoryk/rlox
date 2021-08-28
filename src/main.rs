@@ -1,11 +1,11 @@
-mod types;
 mod lox;
 mod scanner;
+mod types;
 
+use lox::Lox;
 use std::fmt;
 use structopt::StructOpt;
 use types::Token;
-use lox::Lox;
 
 #[derive(StructOpt)]
 struct Cli {
@@ -19,6 +19,6 @@ fn main() {
     let mut lox = Lox::new();
     match args.path {
         Some(path) => lox.run_file(path),
-        None => lox.repl()
+        None => lox.repl(),
     }
 }

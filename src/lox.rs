@@ -13,24 +13,24 @@ impl Lox {
 }
 
 impl Lox {
-    fn report(&self, line_number: u32, loc: String, message: String) {
+    fn report(&self, line_number: usize, loc: String, message: String) {
         println!("[line {}] Error {}: {}", line_number, loc, message);
     }
 
-    fn error(&mut self, line_number: u32, message: String) {
+    pub fn error(&mut self, line_number: usize, message: String) {
         self.report(line_number, String::from(""), message);
         self.had_error = true;
     }
 
-    fn run(&self, line: String) {
-        let scanner = Scanner{};
-        let tokens = scanner.scan_tokens(line);
-        for token in tokens {
+    fn run(&mut self, line: String) {
+        let mut scanner = Scanner::new(line);
+        scanner.scan_tokens(self);
+        for token in scanner.tokens {
             println!("{:?}", token);
         }
     }
 
-    pub fn run_file(&self, path: std::path::PathBuf) {
+    pub fn run_file(&mut self, path: std::path::PathBuf) {
         println!("Running {:?}", path);
         let content = std::fs::read_to_string(&path).expect("could not read file");
         for line in content.lines() {
