@@ -65,7 +65,55 @@ pub struct Token<'a> {
 
 impl<'a> fmt::Display for Token<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?} {:?} {:?}", self.kind, self.lexeme, self.literal)
+        let formatted: String;
+        let s = match self.kind {
+            TokenKind::LeftParen => "(",
+            TokenKind::RightParen => ")",
+            TokenKind::LeftBrace => "{",
+            TokenKind::RightBrace => "}",
+            TokenKind::Comma => ",",
+            TokenKind::Dot => ".",
+            TokenKind::Minus => "-",
+            TokenKind::Plus => "+",
+            TokenKind::Semicolon => ";",
+            TokenKind::Slash => "/",
+            TokenKind::Star => "*",
+            TokenKind::Bang => "!",
+            TokenKind::BangEqual => "!=",
+            TokenKind::Equal => "=",
+            TokenKind::EqualEqual => "==",
+            TokenKind::Greater => ">",
+            TokenKind::GreaterEqual => ">=",
+            TokenKind::Less => "<",
+            TokenKind::LessEqual => "<=",
+            TokenKind::Identifier => self.literal.unwrap(),
+            TokenKind::String => {
+                formatted = format!("\"{}\"", self.literal.unwrap());
+                &formatted
+            },
+            TokenKind::Number => {
+                formatted = format!("{}", self.numeric_literal.unwrap());
+                &formatted
+            },
+            TokenKind::And => "&&",
+            TokenKind::Class => self.literal.unwrap(),
+            TokenKind::Else => "else",
+            TokenKind::False => "false",
+            TokenKind::Fun => "fun",
+            TokenKind::For => "for",
+            TokenKind::If => "if",
+            TokenKind::Nil => "nil",
+            TokenKind::Or => "||",
+            TokenKind::Print => "print",
+            TokenKind::Return => "return",
+            TokenKind::Super => "super",
+            TokenKind::This => "this",
+            TokenKind::True => "true",
+            TokenKind::Var => "var",
+            TokenKind::While => "while",
+            TokenKind::Eof => "\0",
+        };
+        write!(f, "{}", s)
     }
 }
 

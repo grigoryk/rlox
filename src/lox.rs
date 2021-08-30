@@ -25,7 +25,7 @@ impl Lox {
         let scanner = Scanner::new(source);
         let tokens = scanner.scan_tokens(self);
         for token in tokens {
-            println!("{:?}", token);
+            print!("{}", token);
         }
     }
 
@@ -33,6 +33,7 @@ impl Lox {
         println!("Running {:?}", path);
         let source = std::fs::read_to_string(&path)?;
         self.run(&source);
+        println!("");
         if self.had_error {
             println!("Error during scanning, exit...");
             std::process::exit(1);
