@@ -21,7 +21,7 @@ impl Lox {
         self.had_error = true;
     }
 
-    fn run(&mut self, source: &String) {
+    fn run(&mut self, source: &str) {
         let scanner = Scanner::new(source);
         let tokens = scanner.scan_tokens(self);
         for token in tokens {

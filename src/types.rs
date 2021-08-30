@@ -59,6 +59,7 @@ pub struct Token<'a> {
     pub kind: TokenKind,
     pub lexeme: Option<&'a str>,
     pub literal: Option<&'a str>,
+    pub numeric_literal: Option<f64>,
     pub line: usize,
 }
 
@@ -82,14 +83,32 @@ impl<'a> Token<'a> {
                 if scan_index.start == scan_index.start + length {
                     None
                 } else {
-                    Some(&source[scan_index.start + 1..scan_index.start + length])
+                    match kind {
+                        TokenKind::String => {
+                            Some(&source[scan_index.start + 1..scan_index.start + length])
+                        }
+                        TokenKind::Number => {
+                            Some(&source[scan_index.start..scan_index.start + length])
+                        }
+                        _ => None,
+                    }
                 }
             }
         };
+        let numeric_literal = match kind {
+            TokenKind::Number => Some(
+                literal
+                    .expect("number can't be empty")
+                    .parse()
+                    .expect("invalid number literal"),
+            ),
+            _ => None,
+        };
         Token {
-            kind: kind,
+            kind,
             lexeme: Some(text),
-            literal: literal,
+            literal,
+            numeric_literal,
             line: scan_index.line,
         }
     }

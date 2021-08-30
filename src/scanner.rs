@@ -27,6 +27,7 @@ enum ScanResult<'a> {
     MultiCharLexeme(usize, Token<'a>),
     CommentLexeme(usize),
     StringLexeme(usize, usize, Token<'a>),
+    NumberLexeme(usize, Token<'a>),
     Whitespace,
     Newline,
     Error(&'a str),
@@ -75,6 +76,10 @@ impl<'a> Scanner<'a> {
                     scan_index.line += extra_lines;
                     tokens.push(token);
                 }
+                ScanResult::NumberLexeme(length, token) => {
+                    scan_index.current += length;
+                    tokens.push(token);
+                }
                 ScanResult::Error(msg) => {
                     scan_index.current += 1;
                     lox.error(scan_index.line, msg);
@@ -86,6 +91,7 @@ impl<'a> Scanner<'a> {
             kind: TokenKind::Eof,
             lexeme: None,
             literal: None,
+            numeric_literal: None,
             line: scan_index.line,
         });
 
@@ -244,7 +250,28 @@ impl<'a> Scanner<'a> {
             // literals
             Some('"') => self.string(scan_index),
 
+            Some('0') | Some('1') | Some('2') | Some('3') | Some('4') | Some('5') | Some('6')
+            | Some('7') | Some('8') | Some('9') => self.number(scan_index),
+
             _ => ScanResult::Error("Unexpected character"),
+        }
+    }
+
+    fn number(&self, scan_index: &ScanIndex) -> ScanResult {
+        // determine length of the number
+        let mut length = 1;
+        loop {
+            match self.peek_offset(scan_index, length) {
+                Some('0') | Some('1') | Some('2') | Some('3') | Some('4') | Some('5')
+                | Some('6') | Some('7') | Some('8') | Some('9') | Some('.') => {}
+                Some(_) | None => {
+                    break ScanResult::NumberLexeme(
+                        length,
+                        Token::new(TokenKind::Number, self.source, scan_index, Some(length)),
+                    )
+                }
+            }
+            length += 1;
         }
     }
 
@@ -261,9 +288,9 @@ impl<'a> Scanner<'a> {
                         extra_lines,
                         Token::new(TokenKind::String, self.source, scan_index, Some(length)),
                     )
-                },
+                }
                 Some('\n') => extra_lines += 1,
-                Some(_) => {},
+                Some(_) => {}
                 None => break ScanResult::Error("Unterminated string"),
             }
             length += 1;
@@ -274,9 +301,14 @@ impl<'a> Scanner<'a> {
         return if scan_index.at_end(offset) {
             None
         } else {
-            Some(self.source.chars().nth(scan_index.current + offset).expect(
-                format!("source out of bounds at {}", scan_index.current + offset).as_str(),
-            ))
+            Some(
+                self.source
+                    .chars()
+                    .nth(scan_index.current + offset)
+                    .unwrap_or_else(|| {
+                        panic!("source out of bounds at {}", scan_index.current + offset)
+                    }),
+            )
         };
     }
 }
