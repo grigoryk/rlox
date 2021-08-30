@@ -1,5 +1,7 @@
 use std::fmt;
 
+use crate::scanner::{ScanIndex, Scanner};
+
 #[derive(Debug)]
 pub enum TokenKind {
     // Single-character tokens,
@@ -53,15 +55,42 @@ pub enum TokenKind {
 }
 
 #[derive(Debug)]
-pub struct Token {
+pub struct Token<'a> {
     pub kind: TokenKind,
-    pub lexeme: String,
-    pub literal: Option<String>,
+    pub lexeme: Option<&'a str>,
+    pub literal: Option<&'a str>,
     pub line: usize,
 }
 
-impl fmt::Display for Token {
+impl<'a> fmt::Display for Token<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?} {:?} {:?}", self.kind, self.lexeme, self.literal)
+    }
+}
+
+impl<'a> Token<'a> {
+    pub fn new(
+        kind: TokenKind,
+        source: &'a str,
+        scan_index: &ScanIndex,
+        literal_length: Option<usize>,
+    ) -> Token<'a> {
+        let text = &source[scan_index.start..scan_index.current];
+        let literal = match literal_length {
+            None => None,
+            Some(length) => {
+                if scan_index.start == scan_index.current {
+                    None
+                } else {
+                    Some(&source[scan_index.start + 1..length - 1])
+                }
+            }
+        };
+        Token {
+            kind: kind,
+            lexeme: Some(text),
+            literal: literal,
+            line: scan_index.line,
+        }
     }
 }

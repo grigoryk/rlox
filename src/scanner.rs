@@ -3,146 +3,258 @@ use crate::{
     types::{Token, TokenKind},
 };
 
-pub struct Scanner {
-    source: String,
-    pub tokens: Vec<Token>,
-    start: usize,
-    current: usize,
-    line: usize,
+pub struct Scanner<'a> {
+    pub source: &'a str,
 }
 
-impl Scanner {
-    pub fn new(source: String) -> Scanner {
-        Scanner {
-            source,
-            tokens: vec![],
+#[derive(Debug)]
+pub struct ScanIndex {
+    pub start: usize,
+    pub current: usize,
+    pub line: usize,
+    pub source_length: usize,
+}
+
+impl ScanIndex {
+    fn at_end(&self, offset: usize) -> bool {
+        self.current + offset >= self.source_length
+    }
+}
+
+enum ScanResult<'a> {
+    SingleCharLexeme(Token<'a>),
+    DoubleCharLexeme(Token<'a>),
+    MultiCharLexeme(usize, Token<'a>),
+    CommentLexeme(usize),
+    StringLexeme(usize, usize, Token<'a>),
+    Whitespace,
+    Newline,
+    Error(&'a str),
+}
+
+impl<'a> Scanner<'a> {
+    pub fn new(source: &'a str) -> Scanner<'a> {
+        Scanner { source }
+    }
+
+    pub fn scan_tokens(&'a self, lox: &mut Lox) -> Vec<Token<'a>> {
+        let mut tokens = vec![];
+        let mut scan_index = ScanIndex {
             start: 0,
             current: 0,
             line: 1,
-        }
-    }
-
-    pub fn scan_tokens(&mut self, lox: &mut Lox) {
-        while !self.is_at_end() {
-            self.start = self.current;
-            self.scan_token(lox);
-        }
-
-        self.tokens.push(Token {
-            kind: TokenKind::Eof,
-            lexeme: String::from(""),
-            literal: None,
-            line: self.line,
-        });
-    }
-
-    fn is_at_end(&self) -> bool {
-        self.current >= self.source.chars().count()
-    }
-
-    fn scan_token(&mut self, lox: &mut Lox) {
-        match self.advance() {
-            // whitespace
-            ' ' | '\r' | '\t' => {},
-            // newline
-            '\n' => {
-                println!("newline!");
-                self.line += 1
-            },
-            // single-character lexemes
-            '(' => self.add_token(TokenKind::LeftParen, None),
-            ')' => self.add_token(TokenKind::RightParen, None),
-            '{' => self.add_token(TokenKind::LeftBrace, None),
-            '}' => self.add_token(TokenKind::RightBrace, None),
-            ',' => self.add_token(TokenKind::Comma, None),
-            '.' => self.add_token(TokenKind::Dot, None),
-            '-' => self.add_token(TokenKind::Minus, None),
-            '+' => self.add_token(TokenKind::Plus, None),
-            ';' => self.add_token(TokenKind::Semicolon, None),
-            '*' => self.add_token(TokenKind::Star, None),
-            '/' => {
-                // if this is a comment, denoted by //, skip until end of the line
-                if self.advance_if_next('/') {
-                    while self.peek() != '\n' && !self.is_at_end() {
-                        self.advance();
-                    }
-                } else {
-                    self.add_token(TokenKind::Slash, None)
-                }
-            },
-            // single or two character lexemes
-            '!' => {
-                let kind = match self.advance_if_next('=') {
-                    true => TokenKind::BangEqual,
-                    false => TokenKind::Bang,
-                };
-                self.add_token(kind, None)
-            },
-            '=' => {
-                let kind = match self.advance_if_next('=') {
-                    true => TokenKind::EqualEqual,
-                    false => TokenKind::Equal,
-                };
-                self.add_token(kind, None)
-            },
-            '<' => {
-                let kind = match self.advance_if_next('=') {
-                    true => TokenKind::LessEqual,
-                    false => TokenKind::Less,
-                };
-                self.add_token(kind, None)
-            },
-            '>' => {
-                let kind = match self.advance_if_next('=') {
-                    true => TokenKind::GreaterEqual,
-                    false => TokenKind::Greater,
-                };
-                self.add_token(kind, None)
-            },
-
-            _ => lox.error(self.line, format!("Unexpected character")),
-        }
-    }
-
-    fn current_char(&self) -> char {
-        self.source
-            .chars()
-            .nth(self.current)
-            .expect(format!("source out of bounds at {}", self.current).as_str())
-    }
-
-    fn advance(&mut self) -> char {
-        let c = self.current_char();
-        self.current += 1;
-        c
-    }
-
-    fn advance_if_next(&mut self, conditional: char) -> bool {
-        return if self.is_at_end() {
-            false
-        } else if self.current_char() != conditional {
-            false
-        } else {
-            self.current += 1;
-            true
+            source_length: self.source.chars().count(),
         };
+        while !scan_index.at_end(0) {
+            scan_index.start = scan_index.current;
+            match self.scan_token(&scan_index) {
+                ScanResult::SingleCharLexeme(token) => {
+                    scan_index.current += 1;
+                    tokens.push(token);
+                }
+                ScanResult::DoubleCharLexeme(token) => {
+                    scan_index.current += 2;
+                    tokens.push(token);
+                }
+                ScanResult::MultiCharLexeme(length, token) => {
+                    scan_index.current += length;
+                    tokens.push(token);
+                }
+                ScanResult::Whitespace => {
+                    scan_index.current += 1;
+                }
+                ScanResult::Newline => {
+                    scan_index.current += 1;
+                    scan_index.line += 1;
+                }
+                ScanResult::CommentLexeme(length) => {
+                    scan_index.current += length;
+                }
+                ScanResult::StringLexeme(length, extra_lines, token) => {
+                    scan_index.current += length;
+                    scan_index.line += extra_lines;
+                    tokens.push(token);
+                }
+                ScanResult::Error(msg) => {
+                    scan_index.current += 1;
+                    lox.error(scan_index.line, msg);
+                }
+            };
+        }
+
+        tokens.push(Token {
+            kind: TokenKind::Eof,
+            lexeme: None,
+            literal: None,
+            line: scan_index.line,
+        });
+
+        tokens
     }
 
-    fn peek(&self) -> char {
-        return if self.is_at_end() {
-            '\0'
-        } else {
-            self.current_char()
+    fn scan_token(&'a self, scan_index: &ScanIndex) -> ScanResult {
+        match self.peek_offset(&scan_index, 0) {
+            // whitespace
+            Some(' ') | Some('\r') | Some('\t') => ScanResult::Whitespace,
+            // newline
+            Some('\n') => ScanResult::Newline,
+            // single-character lexemes
+            Some('(') => ScanResult::SingleCharLexeme(Token::new(
+                TokenKind::LeftParen,
+                self.source,
+                scan_index,
+                None,
+            )),
+            Some(')') => ScanResult::SingleCharLexeme(Token::new(
+                TokenKind::RightParen,
+                self.source,
+                scan_index,
+                None,
+            )),
+            Some('{') => ScanResult::SingleCharLexeme(Token::new(
+                TokenKind::LeftBrace,
+                self.source,
+                scan_index,
+                None,
+            )),
+            Some('}') => ScanResult::SingleCharLexeme(Token::new(
+                TokenKind::RightBrace,
+                self.source,
+                scan_index,
+                None,
+            )),
+            Some(',') => ScanResult::SingleCharLexeme(Token::new(
+                TokenKind::Comma,
+                self.source,
+                scan_index,
+                None,
+            )),
+            Some('.') => ScanResult::SingleCharLexeme(Token::new(
+                TokenKind::Dot,
+                self.source,
+                scan_index,
+                None,
+            )),
+            Some('-') => ScanResult::SingleCharLexeme(Token::new(
+                TokenKind::Minus,
+                self.source,
+                scan_index,
+                None,
+            )),
+            Some('+') => ScanResult::SingleCharLexeme(Token::new(
+                TokenKind::Plus,
+                self.source,
+                scan_index,
+                None,
+            )),
+            Some(';') => ScanResult::SingleCharLexeme(Token::new(
+                TokenKind::Semicolon,
+                self.source,
+                scan_index,
+                None,
+            )),
+            Some('*') => ScanResult::SingleCharLexeme(Token::new(
+                TokenKind::Star,
+                self.source,
+                scan_index,
+                None,
+            )),
+            Some('/') => {
+                // if this is a single-line comment, denoted by //, figure out its length. Comment terminates either at newline or EOF.
+                match self.peek_offset(&scan_index, 1) {
+                    Some('/') => {
+                        let mut length = 2;
+                        loop {
+                            match self.peek_offset(scan_index, length) {
+                                Some('\n') | None => {
+                                    break ScanResult::CommentLexeme(length);
+                                }
+                                Some(_) => {
+                                    length += 1;
+                                }
+                            }
+                        }
+                    }
+                    _ => ScanResult::SingleCharLexeme(Token::new(
+                        TokenKind::Slash,
+                        self.source,
+                        &scan_index,
+                        None,
+                    )),
+                }
+            }
+            // single or two character lexemes
+            Some('!') => match self.peek_offset(&scan_index, 1) {
+                Some('=') => ScanResult::DoubleCharLexeme(Token::new(
+                    TokenKind::BangEqual,
+                    self.source,
+                    scan_index,
+                    None,
+                )),
+                _ => ScanResult::SingleCharLexeme(Token::new(
+                    TokenKind::Bang,
+                    self.source,
+                    scan_index,
+                    None,
+                )),
+            },
+            Some('=') => match self.peek_offset(&scan_index, 1) {
+                Some('=') => ScanResult::DoubleCharLexeme(Token::new(
+                    TokenKind::EqualEqual,
+                    self.source,
+                    scan_index,
+                    None,
+                )),
+                _ => ScanResult::SingleCharLexeme(Token::new(
+                    TokenKind::Equal,
+                    self.source,
+                    scan_index,
+                    None,
+                )),
+            },
+            Some('<') => match self.peek_offset(&scan_index, 1) {
+                Some('=') => ScanResult::DoubleCharLexeme(Token::new(
+                    TokenKind::LessEqual,
+                    self.source,
+                    scan_index,
+                    None,
+                )),
+                _ => ScanResult::SingleCharLexeme(Token::new(
+                    TokenKind::Less,
+                    self.source,
+                    scan_index,
+                    None,
+                )),
+            },
+            Some('>') => match self.peek_offset(&scan_index, 1) {
+                Some('=') => ScanResult::DoubleCharLexeme(Token::new(
+                    TokenKind::GreaterEqual,
+                    self.source,
+                    scan_index,
+                    None,
+                )),
+                _ => ScanResult::SingleCharLexeme(Token::new(
+                    TokenKind::Greater,
+                    self.source,
+                    scan_index,
+                    None,
+                )),
+            },
+
+            _ => ScanResult::Error("Unexpected character"),
         }
     }
 
-    fn add_token(&mut self, kind: TokenKind, literal: Option<String>) {
-        let text = &self.source[self.start..self.current];
-        self.tokens.push(Token {
-            kind: kind,
-            lexeme: text.to_string(),
-            literal: literal,
-            line: self.line,
-        })
+    fn peek_offset(&self, scan_index: &ScanIndex, offset: usize) -> Option<char> {
+        return if scan_index.at_end(offset) {
+            None
+        } else {
+            Some(
+                self.source
+                    .chars()
+                    .nth(scan_index.current + offset)
+                    .expect(format!("source out of bounds at {}", scan_index.current).as_str()),
+            )
+        };
     }
 }

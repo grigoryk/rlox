@@ -1,3 +1,4 @@
+use std::io;
 use text_io::read;
 
 use crate::scanner::Scanner;
@@ -10,34 +11,33 @@ impl Lox {
     pub fn new() -> Lox {
         Lox { had_error: false }
     }
-}
 
-impl Lox {
-    fn report(&self, line_number: usize, loc: String, message: String) {
+    fn report(&self, line_number: usize, loc: String, message: &str) {
         println!("[line {}] Error {}: {}", line_number, loc, message);
     }
 
-    pub fn error(&mut self, line_number: usize, message: String) {
+    pub fn error(&mut self, line_number: usize, message: &str) {
         self.report(line_number, String::from(""), message);
         self.had_error = true;
     }
 
-    fn run(&mut self, line: String) {
-        let mut scanner = Scanner::new(line);
-        scanner.scan_tokens(self);
-        for token in scanner.tokens {
+    fn run(&mut self, source: &String) {
+        let scanner = Scanner::new(source);
+        let tokens = scanner.scan_tokens(self);
+        for token in tokens {
             println!("{:?}", token);
         }
     }
 
-    pub fn run_file(&mut self, path: std::path::PathBuf) {
+    pub fn run_file(&mut self, path: std::path::PathBuf) -> io::Result<()> {
         println!("Running {:?}", path);
-        let content = std::fs::read_to_string(&path).expect("could not read file");
-        self.run(content);
+        let source = std::fs::read_to_string(&path)?;
+        self.run(&source);
         if self.had_error {
             println!("Error during scanning, exit...");
             std::process::exit(1);
         }
+        Ok(())
     }
 
     pub fn repl(&mut self) {
@@ -45,7 +45,7 @@ impl Lox {
         println!("--------------");
         loop {
             let line: String = read!("{}\n");
-            self.run(line);
+            self.run(&line);
             self.had_error = false;
         }
     }

@@ -16,7 +16,7 @@ fn main() {
     let args = Cli::from_args();
     let mut lox = Lox::new();
     match args.path {
-        Some(path) => lox.run_file(path),
+        Some(path) => lox.run_file(path).expect("error while running file"),
         None => lox.repl(),
     }
 }
