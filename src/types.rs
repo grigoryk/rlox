@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::scanner::{ScanIndex, Scanner};
+use crate::scanner::ScanIndex;
 
 #[derive(Debug)]
 pub enum TokenKind {
@@ -79,10 +79,10 @@ impl<'a> Token<'a> {
         let literal = match literal_length {
             None => None,
             Some(length) => {
-                if scan_index.start == scan_index.current {
+                if scan_index.start == scan_index.start + length {
                     None
                 } else {
-                    Some(&source[scan_index.start + 1..length - 1])
+                    Some(&source[scan_index.start + 1..scan_index.start + length])
                 }
             }
         };

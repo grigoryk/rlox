@@ -71,7 +71,7 @@ impl<'a> Scanner<'a> {
                     scan_index.current += length;
                 }
                 ScanResult::StringLexeme(length, extra_lines, token) => {
-                    scan_index.current += length;
+                    scan_index.current += length + 2; // length of string + ""
                     scan_index.line += extra_lines;
                     tokens.push(token);
                 }
@@ -161,7 +161,7 @@ impl<'a> Scanner<'a> {
             )),
             Some('/') => {
                 // if this is a single-line comment, denoted by //, figure out its length. Comment terminates either at newline or EOF.
-                match self.peek_offset(&scan_index, 1) {
+                match self.peek_offset(scan_index, 1) {
                     Some('/') => {
                         let mut length = 2;
                         loop {
@@ -184,7 +184,7 @@ impl<'a> Scanner<'a> {
                 }
             }
             // single or two character lexemes
-            Some('!') => match self.peek_offset(&scan_index, 1) {
+            Some('!') => match self.peek_offset(scan_index, 1) {
                 Some('=') => ScanResult::DoubleCharLexeme(Token::new(
                     TokenKind::BangEqual,
                     self.source,
@@ -198,7 +198,7 @@ impl<'a> Scanner<'a> {
                     None,
                 )),
             },
-            Some('=') => match self.peek_offset(&scan_index, 1) {
+            Some('=') => match self.peek_offset(scan_index, 1) {
                 Some('=') => ScanResult::DoubleCharLexeme(Token::new(
                     TokenKind::EqualEqual,
                     self.source,
@@ -212,7 +212,7 @@ impl<'a> Scanner<'a> {
                     None,
                 )),
             },
-            Some('<') => match self.peek_offset(&scan_index, 1) {
+            Some('<') => match self.peek_offset(scan_index, 1) {
                 Some('=') => ScanResult::DoubleCharLexeme(Token::new(
                     TokenKind::LessEqual,
                     self.source,
@@ -226,7 +226,7 @@ impl<'a> Scanner<'a> {
                     None,
                 )),
             },
-            Some('>') => match self.peek_offset(&scan_index, 1) {
+            Some('>') => match self.peek_offset(scan_index, 1) {
                 Some('=') => ScanResult::DoubleCharLexeme(Token::new(
                     TokenKind::GreaterEqual,
                     self.source,
@@ -241,7 +241,32 @@ impl<'a> Scanner<'a> {
                 )),
             },
 
+            // literals
+            Some('"') => self.string(scan_index),
+
             _ => ScanResult::Error("Unexpected character"),
+        }
+    }
+
+    fn string(&self, scan_index: &ScanIndex) -> ScanResult {
+        // determine length of string
+        let mut length = 0;
+        // for multiline strings
+        let mut extra_lines = 0;
+        loop {
+            match self.peek_offset(scan_index, length + 1) {
+                Some('"') => {
+                    break ScanResult::StringLexeme(
+                        length,
+                        extra_lines,
+                        Token::new(TokenKind::String, self.source, scan_index, Some(length)),
+                    )
+                },
+                Some('\n') => extra_lines += 1,
+                Some(_) => {},
+                None => break ScanResult::Error("Unterminated string"),
+            }
+            length += 1;
         }
     }
 
@@ -249,12 +274,9 @@ impl<'a> Scanner<'a> {
         return if scan_index.at_end(offset) {
             None
         } else {
-            Some(
-                self.source
-                    .chars()
-                    .nth(scan_index.current + offset)
-                    .expect(format!("source out of bounds at {}", scan_index.current).as_str()),
-            )
+            Some(self.source.chars().nth(scan_index.current + offset).expect(
+                format!("source out of bounds at {}", scan_index.current + offset).as_str(),
+            ))
         };
     }
 }
