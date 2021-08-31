@@ -1,6 +1,6 @@
 use crate::{
     lox::Lox,
-    types::{Token, TokenKind},
+    types::{Token, TokenKind, KEYWORDS},
 };
 
 pub struct Scanner<'a> {
@@ -99,73 +99,77 @@ impl<'a> Scanner<'a> {
     }
 
     fn scan_token(&'a self, scan_index: &ScanIndex) -> ScanResult {
-        match self.peek_offset(&scan_index, 0) {
+        let c = self.peek_offset(&scan_index, 0);
+        if c.is_none() {
+            return ScanResult::Error("Unexpected EOF");
+        }
+        match c.unwrap() {
             // whitespace
-            Some(' ') | Some('\r') | Some('\t') => ScanResult::Whitespace,
+            ' ' | '\r' | '\t' => ScanResult::Whitespace,
             // newline
-            Some('\n') => ScanResult::Newline,
+            '\n' => ScanResult::Newline,
             // single-character lexemes
-            Some('(') => ScanResult::SingleCharLexeme(Token::new(
+            '(' => ScanResult::SingleCharLexeme(Token::new(
                 TokenKind::LeftParen,
                 self.source,
                 scan_index,
                 None,
             )),
-            Some(')') => ScanResult::SingleCharLexeme(Token::new(
+            ')' => ScanResult::SingleCharLexeme(Token::new(
                 TokenKind::RightParen,
                 self.source,
                 scan_index,
                 None,
             )),
-            Some('{') => ScanResult::SingleCharLexeme(Token::new(
+            '{' => ScanResult::SingleCharLexeme(Token::new(
                 TokenKind::LeftBrace,
                 self.source,
                 scan_index,
                 None,
             )),
-            Some('}') => ScanResult::SingleCharLexeme(Token::new(
+            '}' => ScanResult::SingleCharLexeme(Token::new(
                 TokenKind::RightBrace,
                 self.source,
                 scan_index,
                 None,
             )),
-            Some(',') => ScanResult::SingleCharLexeme(Token::new(
+            ',' => ScanResult::SingleCharLexeme(Token::new(
                 TokenKind::Comma,
                 self.source,
                 scan_index,
                 None,
             )),
-            Some('.') => ScanResult::SingleCharLexeme(Token::new(
+            '.' => ScanResult::SingleCharLexeme(Token::new(
                 TokenKind::Dot,
                 self.source,
                 scan_index,
                 None,
             )),
-            Some('-') => ScanResult::SingleCharLexeme(Token::new(
+            '-' => ScanResult::SingleCharLexeme(Token::new(
                 TokenKind::Minus,
                 self.source,
                 scan_index,
                 None,
             )),
-            Some('+') => ScanResult::SingleCharLexeme(Token::new(
+            '+' => ScanResult::SingleCharLexeme(Token::new(
                 TokenKind::Plus,
                 self.source,
                 scan_index,
                 None,
             )),
-            Some(';') => ScanResult::SingleCharLexeme(Token::new(
+            ';' => ScanResult::SingleCharLexeme(Token::new(
                 TokenKind::Semicolon,
                 self.source,
                 scan_index,
                 None,
             )),
-            Some('*') => ScanResult::SingleCharLexeme(Token::new(
+            '*' => ScanResult::SingleCharLexeme(Token::new(
                 TokenKind::Star,
                 self.source,
                 scan_index,
                 None,
             )),
-            Some('/') => {
+            '/' => {
                 // if this is a single-line comment, denoted by //, figure out its length. Comment terminates either at newline or EOF.
                 match self.peek_offset(scan_index, 1) {
                     Some('/') => {
@@ -190,7 +194,7 @@ impl<'a> Scanner<'a> {
                 }
             }
             // single or two character lexemes
-            Some('!') => match self.peek_offset(scan_index, 1) {
+            '!' => match self.peek_offset(scan_index, 1) {
                 Some('=') => ScanResult::DoubleCharLexeme(Token::new(
                     TokenKind::BangEqual,
                     self.source,
@@ -204,7 +208,7 @@ impl<'a> Scanner<'a> {
                     None,
                 )),
             },
-            Some('=') => match self.peek_offset(scan_index, 1) {
+            '=' => match self.peek_offset(scan_index, 1) {
                 Some('=') => ScanResult::DoubleCharLexeme(Token::new(
                     TokenKind::EqualEqual,
                     self.source,
@@ -218,7 +222,7 @@ impl<'a> Scanner<'a> {
                     None,
                 )),
             },
-            Some('<') => match self.peek_offset(scan_index, 1) {
+            '<' => match self.peek_offset(scan_index, 1) {
                 Some('=') => ScanResult::DoubleCharLexeme(Token::new(
                     TokenKind::LessEqual,
                     self.source,
@@ -232,7 +236,7 @@ impl<'a> Scanner<'a> {
                     None,
                 )),
             },
-            Some('>') => match self.peek_offset(scan_index, 1) {
+            '>' => match self.peek_offset(scan_index, 1) {
                 Some('=') => ScanResult::DoubleCharLexeme(Token::new(
                     TokenKind::GreaterEqual,
                     self.source,
@@ -248,10 +252,9 @@ impl<'a> Scanner<'a> {
             },
 
             // literals
-            Some('"') => self.string(scan_index),
-
-            Some('0') | Some('1') | Some('2') | Some('3') | Some('4') | Some('5') | Some('6')
-            | Some('7') | Some('8') | Some('9') => self.number(scan_index),
+            '"' => self.string(scan_index),
+            c if c.is_digit(10) => self.number(scan_index),
+            c if c.is_alphabetic() => self.identifier_or_reserved(scan_index),
 
             _ => ScanResult::Error("Unexpected character"),
         }
@@ -294,6 +297,34 @@ impl<'a> Scanner<'a> {
                 None => break ScanResult::Error("Unterminated string"),
             }
             length += 1;
+        }
+    }
+
+    fn identifier_or_reserved(&self, scan_index: &ScanIndex) -> ScanResult {
+        // determine length of identifier
+        let mut length = 1;
+        loop {
+            let c = self.peek_offset(scan_index, length);
+            if c.is_none() || !(c.unwrap().is_ascii_alphanumeric() && c.unwrap() != '_') {
+                break;
+            }
+            length += 1;
+        }
+        let identifier = &self.source[scan_index.start..scan_index.start + length];
+        match KEYWORDS.get(identifier) {
+            Some(kind) => ScanResult::MultiCharLexeme(
+                length,
+                Token::new(*kind, &self.source, scan_index, Some(length)),
+            ),
+            None => ScanResult::MultiCharLexeme(
+                length,
+                Token::new(
+                    TokenKind::Identifier,
+                    &self.source,
+                    scan_index,
+                    Some(length),
+                ),
+            ),
         }
     }
 

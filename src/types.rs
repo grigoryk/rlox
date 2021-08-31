@@ -1,8 +1,33 @@
+use lazy_static::lazy_static;
+use std::collections::HashMap;
 use std::fmt;
 
 use crate::scanner::ScanIndex;
 
-#[derive(Debug)]
+lazy_static! {
+    pub static ref KEYWORDS: HashMap<&'static str, TokenKind> = {
+        let mut m = HashMap::new();
+        m.insert("and", TokenKind::And);
+        m.insert("class", TokenKind::Class);
+        m.insert("else", TokenKind::Else);
+        m.insert("false", TokenKind::False);
+        m.insert("fun", TokenKind::Fun);
+        m.insert("for", TokenKind::For);
+        m.insert("if", TokenKind::If);
+        m.insert("nil", TokenKind::Nil);
+        m.insert("or", TokenKind::Or);
+        m.insert("print", TokenKind::Print);
+        m.insert("return", TokenKind::Return);
+        m.insert("super", TokenKind::Super);
+        m.insert("this", TokenKind::This);
+        m.insert("true", TokenKind::True);
+        m.insert("var", TokenKind::Var);
+        m.insert("while", TokenKind::While);
+        m
+    };
+}
+
+#[derive(Debug, Clone, Copy)]
 pub enum TokenKind {
     // Single-character tokens,
     LeftParen,
@@ -54,6 +79,30 @@ pub enum TokenKind {
     Eof,
 }
 
+impl TokenKind {
+    fn is_keyword(&self) -> bool {
+        match self {
+            TokenKind::And
+            | TokenKind::Class
+            | TokenKind::Else
+            | TokenKind::False
+            | TokenKind::Fun
+            | TokenKind::For
+            | TokenKind::If
+            | TokenKind::Nil
+            | TokenKind::Or
+            | TokenKind::Print
+            | TokenKind::Return
+            | TokenKind::Super
+            | TokenKind::This
+            | TokenKind::True
+            | TokenKind::Var
+            | TokenKind::While => true,
+            _ => false,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Token<'a> {
     pub kind: TokenKind,
@@ -88,13 +137,16 @@ impl<'a> fmt::Display for Token<'a> {
             TokenKind::LessEqual => "<=",
             TokenKind::Identifier => self.literal.unwrap(),
             TokenKind::String => {
-                formatted = format!("\"{}\"", self.literal.unwrap());
+                formatted = format!("\"{}\"", match self.literal {
+                    Some(l) => l,
+                    None => ""
+                });
                 &formatted
-            },
+            }
             TokenKind::Number => {
                 formatted = format!("{}", self.numeric_literal.unwrap());
                 &formatted
-            },
+            }
             TokenKind::And => "&&",
             TokenKind::Class => self.literal.unwrap(),
             TokenKind::Else => "else",
@@ -104,12 +156,12 @@ impl<'a> fmt::Display for Token<'a> {
             TokenKind::If => "if",
             TokenKind::Nil => "nil",
             TokenKind::Or => "||",
-            TokenKind::Print => "print",
+            TokenKind::Print => "print ",
             TokenKind::Return => "return",
             TokenKind::Super => "super",
             TokenKind::This => "this",
             TokenKind::True => "true",
-            TokenKind::Var => "var",
+            TokenKind::Var => "var ",
             TokenKind::While => "while",
             TokenKind::Eof => "\0",
         };
@@ -128,14 +180,17 @@ impl<'a> Token<'a> {
         let literal = match literal_length {
             None => None,
             Some(length) => {
-                if scan_index.start == scan_index.start + length {
+                if length == 0 {
                     None
                 } else {
                     match kind {
                         TokenKind::String => {
-                            Some(&source[scan_index.start + 1..scan_index.start + length])
+                            Some(&source[scan_index.start + 1..scan_index.start + length + 1])
                         }
-                        TokenKind::Number => {
+                        TokenKind::Number | TokenKind::Identifier => {
+                            Some(&source[scan_index.start..scan_index.start + length])
+                        }
+                        kind if kind.is_keyword() => {
                             Some(&source[scan_index.start..scan_index.start + length])
                         }
                         _ => None,
