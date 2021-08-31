@@ -1,4 +1,4 @@
-use std::io;
+use std::io::{self, Write};
 use text_io::read;
 
 use crate::scanner::Scanner;
@@ -27,13 +27,14 @@ impl Lox {
         for token in tokens {
             print!("{}", token);
         }
+        print!("\n");
+        io::stdout().flush().unwrap();
     }
 
     pub fn run_file(&mut self, path: std::path::PathBuf) -> io::Result<()> {
         println!("Running {:?}", path);
         let source = std::fs::read_to_string(&path)?;
         self.run(&source);
-        println!("");
         if self.had_error {
             println!("Error during scanning, exit...");
             std::process::exit(1);
