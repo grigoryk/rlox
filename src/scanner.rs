@@ -1,6 +1,6 @@
 use crate::{
     lox::Lox,
-    types::{Token, TokenKind, KEYWORDS},
+    types::{Grouping, Literal, Misc, Operator, Token, KEYWORDS},
 };
 
 pub struct Scanner<'a> {
@@ -23,7 +23,6 @@ impl ScanIndex {
 
 enum ScanResult<'a> {
     SingleCharLexeme(Token<'a>),
-    DoubleCharLexeme(Token<'a>),
     MultiCharLexeme(usize, Token<'a>),
     CommentLexeme(usize),
     StringLexeme(usize, usize, Token<'a>),
@@ -51,10 +50,6 @@ impl<'a> Scanner<'a> {
             match self.scan_token(&scan_index) {
                 ScanResult::SingleCharLexeme(token) => {
                     scan_index.current += 1;
-                    tokens.push(token);
-                }
-                ScanResult::DoubleCharLexeme(token) => {
-                    scan_index.current += 2;
                     tokens.push(token);
                 }
                 ScanResult::MultiCharLexeme(length, token) => {
@@ -87,14 +82,9 @@ impl<'a> Scanner<'a> {
             };
         }
 
-        tokens.push(Token {
-            kind: TokenKind::Eof,
-            lexeme: None,
-            literal: None,
-            numeric_literal: None,
+        tokens.push(Token::Eof {
             line: scan_index.line,
         });
-
         tokens
     }
 
@@ -108,67 +98,49 @@ impl<'a> Scanner<'a> {
             ' ' | '\r' | '\t' => ScanResult::Whitespace,
             // newline
             '\n' => ScanResult::Newline,
+
             // single-character lexemes
-            '(' => ScanResult::SingleCharLexeme(Token::new(
-                TokenKind::LeftParen,
-                self.source,
-                scan_index,
-                None,
-            )),
-            ')' => ScanResult::SingleCharLexeme(Token::new(
-                TokenKind::RightParen,
-                self.source,
-                scan_index,
-                None,
-            )),
-            '{' => ScanResult::SingleCharLexeme(Token::new(
-                TokenKind::LeftBrace,
-                self.source,
-                scan_index,
-                None,
-            )),
-            '}' => ScanResult::SingleCharLexeme(Token::new(
-                TokenKind::RightBrace,
-                self.source,
-                scan_index,
-                None,
-            )),
-            ',' => ScanResult::SingleCharLexeme(Token::new(
-                TokenKind::Comma,
-                self.source,
-                scan_index,
-                None,
-            )),
-            '.' => ScanResult::SingleCharLexeme(Token::new(
-                TokenKind::Dot,
-                self.source,
-                scan_index,
-                None,
-            )),
-            '-' => ScanResult::SingleCharLexeme(Token::new(
-                TokenKind::Minus,
-                self.source,
-                scan_index,
-                None,
-            )),
-            '+' => ScanResult::SingleCharLexeme(Token::new(
-                TokenKind::Plus,
-                self.source,
-                scan_index,
-                None,
-            )),
-            ';' => ScanResult::SingleCharLexeme(Token::new(
-                TokenKind::Semicolon,
-                self.source,
-                scan_index,
-                None,
-            )),
-            '*' => ScanResult::SingleCharLexeme(Token::new(
-                TokenKind::Star,
-                self.source,
-                scan_index,
-                None,
-            )),
+            '(' => ScanResult::SingleCharLexeme(Token::Grouping {
+                line: scan_index.line,
+                token: Grouping::LeftParen,
+            }),
+            ')' => ScanResult::SingleCharLexeme(Token::Grouping {
+                line: scan_index.line,
+                token: Grouping::RightParen,
+            }),
+            '{' => ScanResult::SingleCharLexeme(Token::Grouping {
+                line: scan_index.line,
+                token: Grouping::LeftBrace,
+            }),
+            '}' => ScanResult::SingleCharLexeme(Token::Grouping {
+                line: scan_index.line,
+                token: Grouping::RightBrace,
+            }),
+
+            ',' => ScanResult::SingleCharLexeme(Token::Misc {
+                line: scan_index.line,
+                token: Misc::Comma,
+            }),
+            '.' => ScanResult::SingleCharLexeme(Token::Misc {
+                line: scan_index.line,
+                token: Misc::Dot,
+            }),
+            ';' => ScanResult::SingleCharLexeme(Token::Misc {
+                line: scan_index.line,
+                token: Misc::Semicolon,
+            }),
+            '-' => ScanResult::SingleCharLexeme(Token::Operator {
+                line: scan_index.line,
+                token: Operator::Minus,
+            }),
+            '+' => ScanResult::SingleCharLexeme(Token::Operator {
+                line: scan_index.line,
+                token: Operator::Plus,
+            }),
+            '*' => ScanResult::SingleCharLexeme(Token::Operator {
+                line: scan_index.line,
+                token: Operator::Star,
+            }),
             '/' => {
                 // if this is a single-line comment, denoted by //, figure out its length. Comment terminates either at newline or EOF.
                 match self.peek_offset(scan_index, 1) {
@@ -185,70 +157,52 @@ impl<'a> Scanner<'a> {
                             }
                         }
                     }
-                    _ => ScanResult::SingleCharLexeme(Token::new(
-                        TokenKind::Slash,
-                        self.source,
-                        &scan_index,
-                        None,
-                    )),
+                    _ => ScanResult::SingleCharLexeme(Token::Operator {
+                        line: scan_index.line,
+                        token: Operator::Slash,
+                    }),
                 }
             }
             // single or two character lexemes
             '!' => match self.peek_offset(scan_index, 1) {
-                Some('=') => ScanResult::DoubleCharLexeme(Token::new(
-                    TokenKind::BangEqual,
-                    self.source,
-                    scan_index,
-                    None,
-                )),
-                _ => ScanResult::SingleCharLexeme(Token::new(
-                    TokenKind::Bang,
-                    self.source,
-                    scan_index,
-                    None,
-                )),
+                Some('=') => ScanResult::SingleCharLexeme(Token::Operator {
+                    line: scan_index.line,
+                    token: Operator::BangEqual,
+                }),
+                _ => ScanResult::SingleCharLexeme(Token::Operator {
+                    line: scan_index.line,
+                    token: Operator::Bang,
+                }),
             },
             '=' => match self.peek_offset(scan_index, 1) {
-                Some('=') => ScanResult::DoubleCharLexeme(Token::new(
-                    TokenKind::EqualEqual,
-                    self.source,
-                    scan_index,
-                    None,
-                )),
-                _ => ScanResult::SingleCharLexeme(Token::new(
-                    TokenKind::Equal,
-                    self.source,
-                    scan_index,
-                    None,
-                )),
+                Some('=') => ScanResult::SingleCharLexeme(Token::Operator {
+                    line: scan_index.line,
+                    token: Operator::EqualEqual,
+                }),
+                _ => ScanResult::SingleCharLexeme(Token::Operator {
+                    line: scan_index.line,
+                    token: Operator::Equal,
+                }),
             },
             '<' => match self.peek_offset(scan_index, 1) {
-                Some('=') => ScanResult::DoubleCharLexeme(Token::new(
-                    TokenKind::LessEqual,
-                    self.source,
-                    scan_index,
-                    None,
-                )),
-                _ => ScanResult::SingleCharLexeme(Token::new(
-                    TokenKind::Less,
-                    self.source,
-                    scan_index,
-                    None,
-                )),
+                Some('=') => ScanResult::SingleCharLexeme(Token::Operator {
+                    line: scan_index.line,
+                    token: Operator::LessEqual,
+                }),
+                _ => ScanResult::SingleCharLexeme(Token::Operator {
+                    line: scan_index.line,
+                    token: Operator::Less,
+                }),
             },
             '>' => match self.peek_offset(scan_index, 1) {
-                Some('=') => ScanResult::DoubleCharLexeme(Token::new(
-                    TokenKind::GreaterEqual,
-                    self.source,
-                    scan_index,
-                    None,
-                )),
-                _ => ScanResult::SingleCharLexeme(Token::new(
-                    TokenKind::Greater,
-                    self.source,
-                    scan_index,
-                    None,
-                )),
+                Some('=') => ScanResult::SingleCharLexeme(Token::Operator {
+                    line: scan_index.line,
+                    token: Operator::GreaterEqual,
+                }),
+                _ => ScanResult::SingleCharLexeme(Token::Operator {
+                    line: scan_index.line,
+                    token: Operator::Greater,
+                }),
             },
 
             // literals
@@ -270,7 +224,15 @@ impl<'a> Scanner<'a> {
                 Some(_) | None => {
                     break ScanResult::NumberLexeme(
                         length,
-                        Token::new(TokenKind::Number, self.source, scan_index, Some(length)),
+                        Token::Literal {
+                            line: scan_index.line,
+                            token: Literal::Number {
+                                literal: self
+                                    .literal(scan_index, length)
+                                    .parse()
+                                    .expect("invalid number literal"),
+                            },
+                        },
                     )
                 }
             }
@@ -289,7 +251,13 @@ impl<'a> Scanner<'a> {
                     break ScanResult::StringLexeme(
                         length,
                         extra_lines,
-                        Token::new(TokenKind::String, self.source, scan_index, Some(length)),
+                        Token::Literal {
+                            line: scan_index.line,
+                            token: Literal::String {
+                                size: length,
+                                literal: self.quoted_literal(scan_index, length),
+                            },
+                        },
                     )
                 }
                 Some('\n') => extra_lines += 1,
@@ -298,6 +266,14 @@ impl<'a> Scanner<'a> {
             }
             length += 1;
         }
+    }
+
+    fn quoted_literal(&self, scan_index: &ScanIndex, length: usize) -> &str {
+        &self.source[scan_index.start + 1..scan_index.start + length + 1]
+    }
+
+    fn literal(&self, scan_index: &ScanIndex, length: usize) -> &str {
+        &self.source[scan_index.start..scan_index.start + length]
     }
 
     fn identifier_or_reserved(&self, scan_index: &ScanIndex) -> ScanResult {
@@ -314,16 +290,20 @@ impl<'a> Scanner<'a> {
         match KEYWORDS.get(identifier) {
             Some(kind) => ScanResult::MultiCharLexeme(
                 length,
-                Token::new(*kind, &self.source, scan_index, Some(length)),
+                Token::Keyword {
+                    line: scan_index.line,
+                    token: *kind,
+                },
             ),
             None => ScanResult::MultiCharLexeme(
                 length,
-                Token::new(
-                    TokenKind::Identifier,
-                    &self.source,
-                    scan_index,
-                    Some(length),
-                ),
+                Token::Literal {
+                    line: scan_index.line,
+                    token: Literal::Identifier {
+                        size: length,
+                        literal: self.literal(scan_index, length),
+                    },
+                },
             ),
         }
     }

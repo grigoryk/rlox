@@ -25,7 +25,7 @@ impl Lox {
         let scanner = Scanner::new(source);
         let tokens = scanner.scan_tokens(self);
         for token in tokens {
-            print!("{}", token);
+            print!("{:?}", token);
         }
         print!("\n");
         io::stdout().flush().unwrap();
