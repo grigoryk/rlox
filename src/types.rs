@@ -1,6 +1,8 @@
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 
+use std::fmt;
+
 lazy_static! {
     pub static ref KEYWORDS: HashMap<&'static str, Keyword> = {
         let mut m = HashMap::new();
@@ -114,4 +116,99 @@ pub enum Token<'a> {
     Literal { line: usize, token: Literal<'a> },
     Keyword { line: usize, token: Keyword },
     Eof { line: usize },
+}
+
+impl<'a> fmt::Display for Token<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Token::Operator { token, .. } => write!(f, "{}", token),
+            Token::Grouping { token, .. } => write!(f, "{}", token),
+            Token::Misc { token, .. } => write!(f, "{}", token),
+            Token::Literal { token, .. } => write!(f, "{}", token),
+            Token::Keyword { token, .. } => write!(f, "{}", token),
+            Token::Eof { .. } => Ok(()),
+        }
+    }
+}
+
+impl fmt::Display for Operator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let op = match self {
+            Operator::Minus => "-",
+            Operator::Plus => "+",
+            Operator::Star => "*",
+            Operator::Equal => "=",
+            Operator::EqualEqual => "==",
+            Operator::Greater => ">",
+            Operator::Less => "<",
+            Operator::Slash => "/",
+            Operator::BangEqual => "!=",
+            Operator::GreaterEqual => ">=",
+            Operator::LessEqual => "<=",
+            Operator::Bang => "!",
+        };
+        write!(f, "{}", op)
+    }
+}
+
+impl fmt::Display for Grouping {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let op = match self {
+            Grouping::LeftParen => "(",
+            Grouping::RightParen => ")",
+            Grouping::LeftBrace => "{",
+            Grouping::RightBrace => "}",
+        };
+        write!(f, "{}", op)
+    }
+}
+
+impl fmt::Display for Misc {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let op = match self {
+            Misc::Comma => ",",
+            Misc::Dot => ".",
+            Misc::Semicolon => ";",
+        };
+        write!(f, "{}", op)
+    }
+}
+
+impl<'a> fmt::Display for Literal<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let number;
+        let op = match self {
+            Literal::Identifier { literal, .. } => literal,
+            Literal::String { literal, .. } => literal,
+            Literal::Number { literal } => {
+                number = format!("{}", literal);
+                number.as_str()
+            }
+        };
+        write!(f, "{}", op)
+    }
+}
+
+impl fmt::Display for Keyword {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let op = match self {
+            Keyword::And => "and",
+            Keyword::Class => "class",
+            Keyword::Else => "else",
+            Keyword::False => "false",
+            Keyword::Fun => "fun",
+            Keyword::For => "for",
+            Keyword::If => "if",
+            Keyword::Nil => "nil",
+            Keyword::Or => "or",
+            Keyword::Print => "print",
+            Keyword::Return => "return",
+            Keyword::Super => "super",
+            Keyword::This => "this",
+            Keyword::True => "true",
+            Keyword::Var => "var",
+            Keyword::While => "while",
+        };
+        write!(f, "{}", op)
+    }
 }

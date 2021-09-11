@@ -27,7 +27,7 @@ impl Lox {
         for token in tokens {
             print!("{:?}", token);
         }
-        print!("\n");
+        println!();
         io::stdout().flush().unwrap();
     }
 
